@@ -5,6 +5,8 @@ Maps poker chip denominations to hardware slots,
 tracks inventory, and orchestrates the dispensing workflow.
 """
 
+from __future__ import annotations
+
 import asyncio
 import logging
 from dataclasses import dataclass, field

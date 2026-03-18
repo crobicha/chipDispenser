@@ -5,6 +5,8 @@ Automatically uses real RPi.GPIO on a Raspberry Pi,
 or falls back to MockGPIO in dev/test environments.
 """
 
+from __future__ import annotations
+
 import logging
 import time
 from dataclasses import dataclass
