@@ -3,6 +3,8 @@ Mock GPIO module for development and testing without physical Raspberry Pi hardw
 Drop-in replacement for RPi.GPIO — automatically used when not running on a Pi.
 """
 
+from __future__ import annotations
+
 import logging
 
 logger = logging.getLogger(__name__)
