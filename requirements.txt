@@ -3,7 +3,8 @@ fastapi>=0.111.0
 uvicorn[standard]>=0.29.0
 
 # Hardware (only installs on real Pi)
-# RPi.GPIO>=0.7.1  # Uncomment on Raspberry Pi
+RPi.GPIO>=0.7.1                          # GPIO for sensors
+adafruit-circuitpython-motorkit>=1.6.0   # Motor HAT (M1–M4 DC motor control)
 
 # Payment processors (add whichever you choose)
 # stripe>=9.0.0

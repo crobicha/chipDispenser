@@ -78,6 +78,30 @@ def remove_event_detect(pin: int) -> None:
     logger.debug(f"[MockGPIO] Event detect removed from pin {pin}")
 
 
+# ── Mock MotorKit (dev/test replacement for adafruit_motorkit) ─────────────────
+
+class MockDCMotor:
+    """Mock DC motor — tracks throttle state for testing."""
+    def __init__(self, port: int) -> None:
+        self._port = port
+        self.throttle: float | None = None
+
+    def __repr__(self) -> str:
+        return f"MockDCMotor(M{self._port}, throttle={self.throttle})"
+
+
+class MockMotorKit:
+    """Mock MotorKit — mimics adafruit_motorkit.MotorKit for M1-M4."""
+    def __init__(self) -> None:
+        self.motor1 = MockDCMotor(1)
+        self.motor2 = MockDCMotor(2)
+        self.motor3 = MockDCMotor(3)
+        self.motor4 = MockDCMotor(4)
+
+    def get_motor(self, port: int) -> MockDCMotor:
+        return getattr(self, f"motor{port}")
+
+
 # Test helpers — not part of real GPIO API
 def _simulate_pin_high(pin: int) -> None:
     """Simulate a pin going HIGH (for unit tests)."""

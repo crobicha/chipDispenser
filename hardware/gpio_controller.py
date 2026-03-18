@@ -1,8 +1,12 @@
 """
 GPIO Controller — low-level pin management for the chip dispenser.
 
-Automatically uses real RPi.GPIO on a Raspberry Pi,
-or falls back to MockGPIO in dev/test environments.
+Motor control: Adafruit Stepper Motor HAT (I2C via adafruit_motorkit).
+  - Motors addressed by HAT port number (1–4, corresponding to M1–M4).
+  - Falls back to MockMotorKit in dev/test environments.
+
+Sensor control: direct RPi.GPIO (IR/optical sensors on GPIO pins).
+  - Falls back to MockGPIO in dev/test environments.
 """
 
 from __future__ import annotations
@@ -13,12 +17,23 @@ from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
 
-# Auto-detect hardware environment
+# ── Motor HAT (MotorKit via I2C) ───────────────────────────────────────────────
+try:
+    from adafruit_motorkit import MotorKit  # type: ignore
+    from hardware.hardware_config import MOTOR_HAT_ADDRESS
+    _motor_kit = MotorKit(address=MOTOR_HAT_ADDRESS)
+    IS_REAL_PI = True
+    logger.info("Adafruit MotorKit found — using Motor HAT")
+except (ImportError, RuntimeError, ValueError):
+    from hardware.mock_gpio import MockMotorKit  # type: ignore
+    _motor_kit = MockMotorKit()
+    IS_REAL_PI = False
+    logger.warning("adafruit_motorkit not found — using MockMotorKit (dev/test mode)")
+
+# ── GPIO for sensors ───────────────────────────────────────────────────────────
 try:
     import RPi.GPIO as GPIO  # type: ignore
-    IS_REAL_PI = True
-    logger.info("Running on real Raspberry Pi — using RPi.GPIO")
-except (ImportError, RuntimeError):
+except (ImportError, RuntimeError, ValueError):
     from hardware.mock_gpio import (  # type: ignore
         BCM, OUT, IN, HIGH, LOW, RISING, FALLING, PUD_UP,
         setmode, setwarnings, setup, output, input as gpio_input,
@@ -26,16 +41,13 @@ except (ImportError, RuntimeError):
         _simulate_pin_high, _simulate_pin_low, _get_pin_state
     )
     import hardware.mock_gpio as GPIO
-    IS_REAL_PI = False
-    logger.warning("RPi.GPIO not found — using MockGPIO (dev/test mode)")
 
 
 @dataclass
 class PinConfig:
     """Pin assignments for one dispenser slot."""
-    motor_pin: int          # Controls motor to spin dispenser
-    sensor_pin: int         # IR or optical sensor — detects chip passing
-    enable_pin: int | None = None  # Optional motor enable/PWM pin
+    motor_port: int         # Motor HAT port number (1–4 → M1–M4)
+    sensor_pin: int         # IR or optical sensor GPIO pin — detects chip passing
 
 
 class GPIOController:
@@ -54,16 +66,15 @@ class GPIOController:
         self._initialized = False
 
     def setup(self) -> None:
-        """Initialize GPIO pins for all slots."""
+        """Initialize GPIO sensor pins and ensure all motors are off."""
         GPIO.setmode(GPIO.BCM)
         GPIO.setwarnings(False)
 
         for slot, cfg in enumerate(self.pin_configs):
-            GPIO.setup(cfg.motor_pin, GPIO.OUT, initial=GPIO.LOW)
             GPIO.setup(cfg.sensor_pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-            if cfg.enable_pin is not None:
-                GPIO.setup(cfg.enable_pin, GPIO.OUT, initial=GPIO.LOW)
-            logger.debug(f"Slot {slot} pins initialized: motor={cfg.motor_pin}, sensor={cfg.sensor_pin}")
+            # Ensure motor starts off
+            _motor_kit.get_motor(cfg.motor_port).throttle = None
+            logger.debug(f"Slot {slot} initialized: M{cfg.motor_port}, sensor pin {cfg.sensor_pin}")
 
         self._initialized = True
         logger.info(f"GPIOController initialized with {len(self.pin_configs)} slot(s)")
@@ -79,12 +90,13 @@ class GPIOController:
             raise RuntimeError("GPIOController.setup() must be called before use")
 
         cfg = self.pin_configs[slot]
-        logger.info(f"Slot {slot}: pulsing motor {pulses}x (pin {cfg.motor_pin})")
+        motor = _motor_kit.get_motor(cfg.motor_port)
+        logger.info(f"Slot {slot}: pulsing M{cfg.motor_port} {pulses}x")
 
         for i in range(pulses):
-            GPIO.output(cfg.motor_pin, GPIO.HIGH)
+            motor.throttle = 1.0
             time.sleep(pulse_ms / 1000)
-            GPIO.output(cfg.motor_pin, GPIO.LOW)
+            motor.throttle = None
             time.sleep(gap_ms / 1000)
             logger.debug(f"  Pulse {i + 1}/{pulses} complete")
 
@@ -109,15 +121,13 @@ class GPIOController:
             raise RuntimeError("GPIOController.setup() must be called before use")
 
         cfg = self.pin_configs[slot]
-        GPIO.output(cfg.motor_pin, GPIO.HIGH if state else GPIO.LOW)
-        logger.debug(f"Slot {slot} motor set {'ON' if state else 'OFF'}")
+        _motor_kit.get_motor(cfg.motor_port).throttle = 1.0 if state else None
+        logger.debug(f"Slot {slot} M{cfg.motor_port} set {'ON' if state else 'OFF'}")
 
     def all_motors_off(self) -> None:
-        """Emergency stop — turn off all motors immediately."""
-        for slot, cfg in enumerate(self.pin_configs):
-            GPIO.output(cfg.motor_pin, GPIO.LOW)
-            if cfg.enable_pin is not None:
-                GPIO.output(cfg.enable_pin, GPIO.LOW)
+        """Emergency stop — release all motors immediately."""
+        for cfg in self.pin_configs:
+            _motor_kit.get_motor(cfg.motor_port).throttle = None
         logger.warning("All motors stopped (emergency stop)")
 
     def teardown(self) -> None:

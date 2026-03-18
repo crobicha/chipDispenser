@@ -8,18 +8,27 @@ BCM (Broadcom) pin numbering is used throughout.
 from hardware.gpio_controller import PinConfig
 from hardware.dispenser import ChipDenomination, ChipColor
 
+# ── Motor HAT I2C address ──────────────────────────────────────────────────────
+# Default is 0x60. If address jumpers (A0–A3) are bridged on the HAT, the
+# address shifts. Run `i2cdetect -y 1` to confirm. This HAT is at 0x6f.
+MOTOR_HAT_ADDRESS: int = 0x6f
+
 # ── Pin assignments ────────────────────────────────────────────────────────────
 # Slot 0 → White ($1), Slot 1 → Red ($5), Slot 2 → Green ($25), Slot 3 → Black ($100)
 
 PIN_CONFIGS: list[PinConfig] = [
-    PinConfig(motor_pin=17, sensor_pin=27),   # Slot 0 — White  $1
-    PinConfig(motor_pin=22, sensor_pin=23),   # Slot 1 — Red    $5
-    PinConfig(motor_pin=24, sensor_pin=25),   # Slot 2 — Green  $25
-    PinConfig(motor_pin=5,  sensor_pin=6),    # Slot 3 — Black  $100
+    PinConfig(motor_port=1, sensor_pin=27),   # Slot 0 — White  $1   (M1)
+
+    PinConfig(motor_port=2, sensor_pin=23),   # Slot 1 — Red    $5   (M2)
+
+    PinConfig(motor_port=3, sensor_pin=25),   # Slot 2 — Green  $25  (M3)
+
+    PinConfig(motor_port=4, sensor_pin=6),    # Slot 3 — Black  $100 (M4)
 ]
 
 # ── Default chip denominations ─────────────────────────────────────────────────
 
+# TODO: defaults are useful for testing but should be set programatically
 DEFAULT_DENOMINATIONS: list[ChipDenomination] = [
     ChipDenomination(color=ChipColor.WHITE, value=1,   slot=0, inventory=100),
     ChipDenomination(color=ChipColor.RED,   value=5,   slot=1, inventory=100),
