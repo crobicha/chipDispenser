@@ -18,17 +18,19 @@ from dataclasses import dataclass
 logger = logging.getLogger(__name__)
 
 # ── Motor HAT (MotorKit via I2C) ───────────────────────────────────────────────
+# Confirmed via `i2cdetect -y 1` — HAT address jumpers shift it from 0x60 to 0x6f
+MOTOR_HAT_ADDRESS: int = 0x6f
+
 try:
     from adafruit_motorkit import MotorKit  # type: ignore
-    from hardware.hardware_config import MOTOR_HAT_ADDRESS
     _motor_kit = MotorKit(address=MOTOR_HAT_ADDRESS)
     IS_REAL_PI = True
     logger.info("Adafruit MotorKit found — using Motor HAT")
-except (ImportError, RuntimeError, ValueError):
+except (ImportError, RuntimeError, ValueError) as e:
     from hardware.mock_gpio import MockMotorKit  # type: ignore
     _motor_kit = MockMotorKit()
     IS_REAL_PI = False
-    logger.warning("adafruit_motorkit not found — using MockMotorKit (dev/test mode)")
+    logger.warning(f"adafruit_motorkit not found — using MockMotorKit (dev/test mode). Reason: {type(e).__name__}: {e}")
 
 # ── GPIO for sensors ───────────────────────────────────────────────────────────
 try:

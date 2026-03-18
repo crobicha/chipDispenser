@@ -8,11 +8,6 @@ BCM (Broadcom) pin numbering is used throughout.
 from hardware.gpio_controller import PinConfig
 from hardware.dispenser import ChipDenomination, ChipColor
 
-# ── Motor HAT I2C address ──────────────────────────────────────────────────────
-# Default is 0x60. If address jumpers (A0–A3) are bridged on the HAT, the
-# address shifts. Run `i2cdetect -y 1` to confirm. This HAT is at 0x6f.
-MOTOR_HAT_ADDRESS: int = 0x6f
-
 # ── Pin assignments ────────────────────────────────────────────────────────────
 # Slot 0 → White ($1), Slot 1 → Red ($5), Slot 2 → Green ($25), Slot 3 → Black ($100)
 
